@@ -33,21 +33,18 @@ template usage {*}{
     "Supported options:\n"
     "  -C, --directory=dir\toutput files in dir\n"
     "  -p, --preserve\tdo not overwrite existing files\n"
-    "  -h, --help\t\tprint usage summary (this text)"
-    "  -pn. --number-of-cores=n user-defined number of available processor cores for their application"
+    "  -h. --help\t\tprint usage summary (this text)"
 }
 
 # defaults
 set odir model/fiacre
 engine mode +overwrite +move-if-change
-set corenumb 0
 
 # parse options
 template options {
     -C - --directory	{ set odir [template arg] }
     -p - --preserve	{ engine mode -overwrite }
     -h - --help		{ puts [template usage]; exit 0 }
-    -pn - --number-of-cores { set corenumb [template arg] }
 }
 
 # add common services to dotgen specification
@@ -97,8 +94,7 @@ set filename [list $outputname ".fcr"]
 
 #foreach c [dotgen components] {
   foreach f $model_files {
-    template parse args $corenumb \
-	string $header \
+    template parse string $header \
         file $f file [join $filename ""]
   }
 #}
@@ -110,8 +106,8 @@ set filename [list $outputname ".fcr"]
 
 # setup build environment
 template parse file bootstrap.sh file bootstrap.sh
-#template parse args [list $input] file model.Makefile.am file Makefile.am
-#template parse file model.configure.ac file configure.ac
+template parse args [list $input] file model.Makefile.am file Makefile.am
+template parse file model.configure.ac file configure.ac
 
 file mkdir $odir/autoconf
 
