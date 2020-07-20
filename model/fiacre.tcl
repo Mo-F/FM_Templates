@@ -155,14 +155,12 @@ foreach t [$comp tasks] {'>
 foreach t [$comp tasks] {'>width_<"[$t name]">_<"[$comp name]"><'
 if {$t!=[lindex [$comp tasks] end]} {'>+<'}}'>/* size of the activities part*/<'}
 if {[llength $services]} {
-if {[llength $activities]} {'><"\n">const size_<"[$comp name]">: nat is width_<"[$comp name]">+Nbnonact_<"[$comp name]">+1<'
-} else {'><"\n">const size_<"[$comp name]">: nat is Nbnonact_<"[$comp name]">+1<'}}'><"\n">type service_<"[$comp name]"> is union <'foreach s $services {'>
+if {[llength $activities]} {'><"\n">const size_<"[$comp name]">: nat is width_<"[$comp name]">+1<'
+} else {'><"\n">const size_<"[$comp name]">: nat is 1<'}}'><"\n">type service_<"[$comp name]"> is union <'
+foreach s $services {'>
 <"[$s name]"><'
-if {[$s kind]=="activity"} {'>_<"[[$s task] name]"><'}'>_<"[$comp name]"> | <'}'>
-None_<"[$comp name]"> end /* possible names of services */<'
-if {[llength $activities]} {'>
-
-type servicetype_<"[$comp name]"> is union Attribute_<"[$comp name]"> | Function_<"[$comp name]"> | Activity_<"[$comp name]"> end<'}'><"\n">type status_<"[$comp name]"> is union  VOID_<"[$comp name]"> /* inactive */ |START_<"[$comp name]"> /*waiting*/ | RUNNING_<"[$comp name]"> /*active*/ | STOP_<"[$comp name]"> /*being interrupted*/ | ETHER_<"[$comp name]"> end<"\n">type dynamicservice_<"[$comp name]"> is record name: service_<"[$comp name]">, current: status_<"[$comp name]">, instance: 0..<'
+if {[$s kind]=="activity"} {'>_<"[[$s task] name]"><'}'>_<"[$comp name]"> | <'}'> None_<"[$comp name]"> end /* possible names of services */
+<"\n">type status_<"[$comp name]"> is union  VOID_<"[$comp name]"> /* inactive */ |START_<"[$comp name]"> /*waiting*/ | RUNNING_<"[$comp name]"> /*active*/ | STOP_<"[$comp name]"> /*being interrupted*/ | ETHER_<"[$comp name]"> end<"\n">type dynamicservice_<"[$comp name]"> is record name: service_<"[$comp name]">, current: status_<"[$comp name]">, instance: 0..<'
 if {[llength $activities]} {'>Max_<"[$comp name]"><'
 } else {'>0<'}'> end /* type of the "turn" shared variables */<'
 if {[llength $services]} {'>
@@ -179,7 +177,6 @@ if {[llength $activities]} {'> | Abort_<"[$comp name]"><'}'> end
 type CR_<"[$comp name]"> is record name: CRName_<"[$comp name]">, who: <'
 if {[llength $activities]} {'>IndexA_<"[$comp name]"><'
 } else {'>0..0<'}'> end
-type CRreply_<"[$comp name]"> is union DONE_<"[$comp name]"> | NOSUCHACT_<"[$comp name]"> end
 <'if {[llength $activities]} {
 set index 0
 foreach t [$comp tasks] {
@@ -191,6 +188,16 @@ if {$codelnumber} {'><"\n">type Mutex_<"[$comp name]"> is array CodNumber_<"[$co
 
 /* functions */<'
 if {[llength $activities]} {'>
+	
+/* can the control task shutdown? */
+
+function endsignal_<"[$comp name]">(execution: staticScheduler_<"[$comp name]">): bool is
+var index: Index_<"[$comp name]">
+begin
+	foreach index do
+		if (not (execution[index].current=ETHER_<"[$comp name]">) and not (execution[index].current=VOID_<"[$comp name]">)) then return false end
+	end; return true
+end
 
 
 /* is an execution task runnable? */
@@ -204,18 +211,6 @@ begin
 	end; return false
 end
 
-/* service type */
-function servtype_<"[$comp name]"> (serv: service_<"[$comp name]">): servicetype_<"[$comp name]"> is
-begin<'
-if {[llength $functions]} {'><"\n\t">if (<'
-foreach f $functions {'>serv=<"[$f name]">_<"[$comp name]"><'
-if {$f == [lindex $functions end]} {'>)<'
-} else {'> or <'}}'> then return Function_<"[$comp name]"> end;<'}
-if {[llength $attributes]} {'><"\n\t">if (<'
-foreach a $attributes {'>serv=<"[$a name]">_<"[$comp name]"><'
-if {$a == [lindex $attributes end]} {'>)<'
-} else {'> or <'}}'> then return Attribute_<"[$comp name]"> end;<'}'><"\n\t">return Activity_<"[$comp name]"> 
-end
 
 /* services that I interrupt */
 function Iinterrupt_<"[$comp name]"> (serv: service_<"[$comp name]">): Interrupts_<"[$comp name]"> is
@@ -292,8 +287,7 @@ function multipleinstances_<"[$comp name]"> (execution: staticScheduler_<"[$comp
 var index: Index_<"[$comp name]"> := 0
 begin
 	foreach index do 
-		if execution[index].name=temp then
-			if not (servtype_<"[$comp name]">(temp)=Activity_<"[$comp name]">) then return index end; 
+		if execution[index].name=temp then 
 			while (index<width_<"[$comp name]"> and execution[index].name=temp) do 
 				if execution[index].current=VOID_<"[$comp name]"> then return index end;
 				index:=index+1
@@ -307,14 +301,17 @@ end<'}'>
 
 /* Processes */
 
+<' if {[llength [dotgen components]]==1} {'>
+
 /* client */
 
 process client_<"[$comp name]">[<'
-if {[llength $services]} {'>req_<"[$comp name]">: out service_<"[$comp name]">, <'}'>Creq_<"[$comp name]">: out CR_<"[$comp name]">,<'
-if {[llength $activities]} {'> reqimm_<"[$comp name]">: out service_<"[$comp name]">, Creqimm_<"[$comp name]">: out CR_<"[$comp name]">, intrep_<"[$comp name]">: in Index_<"[$comp name]">,<'}
-if {[llength $services]} {'> finalrep_<"[$comp name]">: in sync,<'}'> Creply_<"[$comp name]">: in CRreply_<"[$comp name]">] is
-states start, getrep
-var <'if {[llength $activities]} {'>temp: Index_<"[$comp name]">, c: IndexA_<"[$comp name]">, <'}'>tempCrep: CRreply_<"[$comp name]">
+if {[llength $services]} {'>req_<"[$comp name]">: out service_<"[$comp name]">, <'}'>Creq_<"[$comp name]">: out CR_<"[$comp name]"><'
+if {[llength $activities]} {'>, reqimm_<"[$comp name]">: out service_<"[$comp name]">, Creqimm_<"[$comp name]">: out CR_<"[$comp name]"><'}'>] is
+states start<'
+if {[llength $activities]} {'>
+
+var c: IndexA_<"[$comp name]"><'}'>
 
 from start <'if {[llength $services]} {'><"\n\t">select <'
 foreach s $services {'><"\n\t"><'
@@ -325,16 +322,8 @@ foreach s $services {'><"\n\t">[] reqimm_<"[$comp name]">!<"[$s name]"><'
 if {[$s kind]=="activity"} {'>_<"[[$s task] name]"><'}'>_<"[$comp name]"><'}'><"\n\t">[] reqimm_<"[$comp name]">!None_<"[$comp name]"><'}'><"\n\t">[] Creq_<"[$comp name]">!{name=Kill_<"[$comp name]">, who=0}<'
 if {[llength $activities]} {'><"\n\t">[] c:= any; Creq_<"[$comp name]">!{name=Abort_<"[$comp name]">, who=c}
 	[] Creqimm_<"[$comp name]">!{name=Kill_<"[$comp name]">, who=0}
-	[] c:= any; Creqimm_<"[$comp name]">!{name=Abort_<"[$comp name]">, who=c}<'}'><"\n\t">end; to getrep<'
-} else {'>Creq_<"[$comp name]">!{name=Kill_<"[$comp name]">, who=0}; to getrep<'}'>
-
-
-from getrep<'if {[llength $services]} {'> select <'
-if {[llength $activities]} {'><"\n\t\t">intrep_<"[$comp name]">?temp; to getrep
-		[]<'}'> Creply_<"[$comp name]">?tempCrep; to getrep
-		[] finalrep_<"[$comp name]">; to start
-	    end<'
-} else {'> Creply_<"[$comp name]">?tempCrep; to getrep<'}'>
+	[] c:= any; Creqimm_<"[$comp name]">!{name=Abort_<"[$comp name]">, who=c}<'}'><"\n\t">end; to start<'
+} else {'>Creq_<"[$comp name]">!{name=Kill_<"[$comp name]">, who=0}; to start<'}}'>
 
 /* control task */
 
@@ -343,12 +332,10 @@ for {set k [llength [$comp tasks]]} {$k > 0} {incr k -1} {
 	if {[llength [[lindex [$comp tasks] [expr $k-1]] codels]]} {set lastperm $k
 		break}}'>
 
-
 process CT_<"[$comp name]">[<'
 if {$lastperm} {'>end_spawn_<"[[lindex [$comp tasks] [expr $k-1]] name]">_<"[$comp name]">: sync, <'}
-if {[llength $services]} {'>req_<"[$comp name]">: in service_<"[$comp name]">, <'}'>Creq_<"[$comp name]">: in CR_<"[$comp name]">,<'
-if {[llength $activities]} {'> reqimm_<"[$comp name]">: in service_<"[$comp name]">, Creqimm_<"[$comp name]">: in CR_<"[$comp name]">, intrep_<"[$comp name]">: out Index_<"[$comp name]">,<'}
-if {[llength $services]} {'> finalrep_<"[$comp name]">: out sync,<'}'> Creply_<"[$comp name]">: out CRreply_<"[$comp name]">] (<'
+if {[llength $services]} {'>req_<"[$comp name]">: in service_<"[$comp name]">, <'}'>Creq_<"[$comp name]">: in CR_<"[$comp name]"><'
+if {[llength $activities]} {'>, reqimm_<"[$comp name]">: in service_<"[$comp name]">, Creqimm_<"[$comp name]">: in CR_<"[$comp name]"><'}'>] (<'
 if {$argv} {'>&Cores: 0..CoresNumber, <'}
 if {[llength $services]} {'>&execution_<"[$comp name]">: staticScheduler_<"[$comp name]">, &sched_<"[$comp name]">: bool, <'}'>&shut_<"[$comp name]">: bool<'
 if {$codelnumber} {'>, &DMutex_<"[$comp name]">: Mutex_<"[$comp name]"><'}
@@ -356,7 +343,7 @@ if {[llength [dotgen components]]>1} {'>, &Ports: PortsArray<'}'>) is
 states <'
 if {$lastperm} {'>unspawned, <'}'>start,<'
 
-if {[llength $services]} {'> manage, finish, <'}
+if {[llength $activities]} {'> wait_, manage, finish, <'}
 foreach n $needsvalidate {'>v_<"[$n name]">_<'
 if {[$n kind] == "activity"} {'><"[[$n task] name]"><'}'>, <'
 if {[llength [[$n validate] mutex]]} {'>v_<"[$n name]"><'
@@ -372,7 +359,7 @@ foreach f $functions {
 set conflicts [$f mutex]
 foreach c [$f codels] {
 	lappend conflicts [$c mutex]}'><"[$f name]">_, <'
-if {[llength $conflicts]} {'><"[$f name]">_2, <'}}'>manageCR, shutdown
+if {[llength $conflicts]} {'><"[$f name]">_2, <'}}'>shutdown
 var <'
 if {[llength $services]} {'>index: Index_<"[$comp name]">, temp: service_<"[$comp name]">, <'}
 if {[llength $activities]} {'>index2: IndexA_<"[$comp name]">, line: queue width_<"[$comp name]"> of 0..size_<"[$comp name]">-1, launcher: bool:= true, <'}'>tempCR: CR_<"[$comp name]">
@@ -398,8 +385,15 @@ if {$se in $needsvalidate} {'>v_<'}'><"[$se name]">_<"\n\t\t\t">| <'
 } else {
 if {$se in $needsvalidate} {'><"[$se name]">_<"[[$se task] name]">_<"[$comp name]"> -> to v_<"[$se name]">_<"[[$se task] name]"><"\n\t\t\t">| <'}}
 }'> any -> to manage<"\n\t\t\t">end<"\n\t\t">end	     
-	     [] Creqimm_<"[$comp name]">?tempCR; to manageCR
+	     [] Creqimm_<"[$comp name]">?tempCR; <"\n\t">if tempCR.name=Kill_<"[$comp name]"> then
+		foreach index2 do
+			execution_<"[$comp name]">[index2].current:= manageinterrupt_<"[$comp name]"> (execution_<"[$comp name]">, index2)
+		end; shut_<"[$comp name]">:= true; <'
+		if {$argv} {'>Cores:= Cores+1; <'}'> to wait_
+	else  execution_<"[$comp name]">[tempCR.who].current:= manageinterrupt_<"[$comp name]"> (execution_<"[$comp name]">, tempCR.who); to finish
+		end
 	end
+
  	else<'}'><"\n"><'
 if {[llength $services]} {'>
 	select	req_<"[$comp name]">?temp; <"\n\t\t\t">case temp of <"\n\t\t\t"><'
@@ -410,10 +404,21 @@ if {$se in $needsvalidate} {'>v_<'}'><"[$se name]">_<"\n\t\t\t">| <'
 } else {
 if {$se in $needsvalidate} {'><"[$se name]">_<"[[$se task] name]">_<"[$comp name]"> -> to v_<"[$se name]">_<"[[$se task] name]"><"\n\t\t\t">| <'}}
 }'> any -> to manage<"\n\t\t\t">end
-	     [] Creq_<"[$comp name]">?tempCR; to manageCR
+	     [] Creq_<"[$comp name]">?tempCR;
+
+<'
+	     if {[llength $activities]} {'><"\n\t">if tempCR.name=Kill_<"[$comp name]"> then
+		foreach index2 do
+			execution_<"[$comp name]">[index2].current:= manageinterrupt_<"[$comp name]"> (execution_<"[$comp name]">, index2)
+		end; shut_<"[$comp name]">:= true; <'
+		if {$argv} {'>Cores:= Cores+1; <'}'>to wait_
+	else  execution_<"[$comp name]">[tempCR.who].current:= manageinterrupt_<"[$comp name]"> (execution_<"[$comp name]">, tempCR.who); to finish
+		end
 	end<'
+} else {'>shut_<"[$comp name]">:= true; to shutdown<'}
 } else {'>
-	Creq_<"[$comp name]">?tempCR; to manageCR<'}
+	Creq_<"[$comp name]">?tempCR; to shutdown<'}
+	
 if {[llength $activities]} {'><"\n\t">end<'}
 if {[llength $services]} {
 foreach n $needsvalidate {'><"\n\n">from v_<"[$n name]">_<'
@@ -441,35 +446,35 @@ if {![catch {[$n validate] wcet}]} {'>]0,<"[[[$n validate] wcet] value]">];<'
 if {[$n kind] == "activity"} {'>manage<'
 } else {'><"[$n name]">_<'}'>
 		     [] to finish
-		     end<'}}'> 
+		     end<'}}
+if {[llength $activities]} {'>		     
 
 from manage 
+	wait [0,0];
 	index:= multipleinstances_<"[$comp name]">(execution_<"[$comp name]">,temp);
-	if index=size_<"[$comp name]">-1 then wait [0,0]; to finish
-	else<"\n">
-		
-    	line:= sitesincomp_<"[$comp name]">(temp, execution_<"[$comp name]">, index);	
-		while not (empty line) do
+	if index < width_<"[$comp name]"> then	
+	execution_<"[$comp name]">[index].current:= START_<"[$comp name]">;
+    line:= sitesincomp_<"[$comp name]">(temp, execution_<"[$comp name]">, index);	
+	while not (empty line) do
 		execution_<"[$comp name]">[first line].current:= manageinterrupt_<"[$comp name]">(execution_<"[$comp name]">, first line);
-		if execution_<"[$comp name]">[first line].current=STOP_<"[$comp name]"> then launcher:=false end;
 		line:= dequeue line
-		end;
-		if index<width_<"[$comp name]"> then
-			if launcher then execution_<"[$comp name]">[index].current:= RUNNING_<"[$comp name]"> 
-			else execution_<"[$comp name]">[index].current:= START_<"[$comp name]">
-			end;
-			/* send intermediate reply */
-			intrep_<"[$comp name]">!index
-		else wait [0,0]
-		end; to finish
-	
-	end<'}'><'
+	end
+	end; to finish
+<'}}'><'
+
 foreach a $attributes {'><"\n\n">from <"[$a name]">_<"\n\t">wait <'
 set conflicts [$a mutex]
 set time 0
 foreach c [$a codels] {lappend conflicts [$c mutex]
 if {(![catch {$c wcet}]) && ([[$c wcet] value] > $time)} {set time [[$c wcet] value]}}
-if {![llength $conflicts]} {'>[0,<"$time">]; to manage<'
+if {![llength $conflicts]} {'>[0,<"$time">];
+line:= sitesincomp_<"[$comp name]">(temp, execution_<"[$comp name]">, $(size_<"[$comp name]">-1));	
+	while not (empty line) do
+		execution_<"[$comp name]">[first line].current:= manageinterrupt_<"[$comp name]">(execution_<"[$comp name]">, first line);
+		line:= dequeue line
+	end; to <'
+if {[llength $activities]} {'>finish<'
+} else {'>start<'}
 
 } else {'>[0,0]; on (<'
 set mutex [mutex-indexes $comp $a]
@@ -486,7 +491,14 @@ set mutex2 [list]
 foreach m $mutex {
 	if {$m != [lindex $mutex end]} {'>not DMutex_<"[$comp name]">[<"[lindex $m 0]">]/*incmopatible with <"[lindex $m 1]">_<"[lindex $m 2]">*/<'
 	if {$m != [lindex $mutex end-1]} {'> and <'}}}'>); DMutex_<"[$comp name]">[<"$m">]:= true;<"\n\t"> to <"[$a name]">_2<"\n\n">from <"[$a name]">_2
-<"\n\t">wait [0,<"$time">]; DMutex_<"[$comp name]">[<"$m">]:= false; to manage<'}}
+<"\n\t">wait [0,<"$time">]; DMutex_<"[$comp name]">[<"$m">]:= false; 
+line:= sitesincomp_<"[$comp name]">(temp, execution_<"[$comp name]">, $(size_<"[$comp name]">-1));	
+	while not (empty line) do
+		execution_<"[$comp name]">[first line].current:= manageinterrupt_<"[$comp name]">(execution_<"[$comp name]">, first line);
+		line:= dequeue line
+	end; to <'
+if {[llength $activities]} {'>finish<'
+} else {'>start<'}}}
 
 
 foreach f $functions {'><"\n\n">from <"[$f name]">_<"\n\t">wait <'
@@ -494,7 +506,15 @@ set conflicts [$f mutex]
 set time 0
 foreach c [$f codels] {lappend conflicts [$c mutex]
 if {(![catch {$c wcet}]) && ([[$c wcet] value] > $time)} {set time [[$c wcet] value]}}
-if {![llength $conflicts]} {'>[0,<"$time">]; to manage<'
+if {![llength $conflicts]} {'>[0,<"$time">]; 
+
+line:= sitesincomp_<"[$comp name]">(temp, execution_<"[$comp name]">, $(size_<"[$comp name]">-1));	
+	while not (empty line) do
+		execution_<"[$comp name]">[first line].current:= manageinterrupt_<"[$comp name]">(execution_<"[$comp name]">, first line);
+		line:= dequeue line
+	end; to <'
+if {[llength $activities]} {'>finish<'
+} else {'>start<'}
 
 } else {'>[0,0]; on (<'
 set mutex [mutex-indexes $comp $f]
@@ -511,103 +531,107 @@ set mutex2 [list]
 foreach m $mutex {
 	if {$m != [lindex $mutex end]} {'>not DMutex_<"[$comp name]">[<"[lindex $m 0]">]/*incmopatible with <"[lindex $m 1]">_<"[lindex $m 2]">*/<'
 	if {$m != [lindex $mutex end-1]} {'> and <'}}}'>); DMutex_<"[$comp name]">[<"$m">]:= true;<"\n\t"> to <"[$f name]">_2<"\n\n">from <"[$f name]">_2
-<"\n\t">wait [0,<"$time">]; DMutex_<"[$comp name]">[<"$m">]:= false; to manage<'}}'>
+<"\n\t">wait [0,<"$time">]; DMutex_<"[$comp name]">[<"$m">]:= false; 
+line:= sitesincomp_<"[$comp name]">(temp, execution_<"[$comp name]">, $(size_<"[$comp name]">-1));	
+	while not (empty line) do
+		execution_<"[$comp name]">[first line].current:= manageinterrupt_<"[$comp name]">(execution_<"[$comp name]">, first line);
+		line:= dequeue line
+	end; to <'
+if {[llength $activities]} {'>finish<'
+} else {'>start<'}
+}}
 
-from manageCR <'
-if {[llength $activities]} {'><"\n\t">if tempCR.name=Kill_<"[$comp name]"> then
-		foreach index2 do
-			execution_<"[$comp name]">[index2].current:= manageinterrupt_<"[$comp name]"> (execution_<"[$comp name]">, index2)
-		end;
-		Creply_<"[$comp name]">!DONE_<"[$comp name]">; shut_<"[$comp name]">:= true; <'
-		if {$argv} {'>Cores:= Cores+1; <'}'>to shutdown
-	else 	if execution_<"[$comp name]">[tempCR.who].current=VOID_<"[$comp name]"> then Creply_<"[$comp name]">!NOSUCHACT_<"[$comp name]">
-		else execution_<"[$comp name]">[tempCR.who].current:= manageinterrupt_<"[$comp name]"> (execution_<"[$comp name]">, tempCR.who);
-		     Creply_<"[$comp name]">!DONE_<"[$comp name]">
-		end; to finish
-	end<'
-} else {'>Creply_<"[$comp name]">!DONE_<"[$comp name]">; shut_<"[$comp name]">:= true; to shutdown<'}
-if {[llength $services]} {'>
+if {[llength $activities]} {'>
 
  
-from finish /* final replies */<'
-if {[llength $activities]} {'>
+from finish 
+	wait [0,0];
+	
+	/* update final replies */
+	foreach index2 do
+		execution_<"[$comp name]">[index2].current:= clear_<"[$comp name]"> (execution_<"[$comp name]">, index2)
+	end;	
 	/* process pending activities */
 	launcher:= true;
 	foreach index2 do
 		if execution_<"[$comp name]">[index2].current=START_<"[$comp name]"> then
 			line:= sitesincomp_<"[$comp name]">(execution_<"[$comp name]">[index2].name, execution_<"[$comp name]">, index2);
 			while not (empty line) do
-				execution_<"[$comp name]">[first line].current:= manageinterrupt_<"[$comp name]">(execution_<"[$comp name]">, first line);
-				if execution_<"[$comp name]">[first line].current=STOP_<"[$comp name]"> then launcher:= false end; 
+				if (execution_<"[$comp name]">[first line].current=STOP_<"[$comp name]"> or execution_<"[$comp name]">[first line].current=RUNNING_<"[$comp name]">) then launcher:= false end; 
 			line:= dequeue line
 			end;
 			if launcher then execution_<"[$comp name]">[index2].current:= RUNNING_<"[$comp name]"> end;
 			launcher:= true
 		end
 	end;	 
-	/* update final replies */
+	
+	<'
+	if {$argv} {'>Cores:= Cores+1; <'}'> to start
+	
+from wait_ 
+	on endsignal_<"[$comp name]">(execution_<"[$comp name]">);
+	wait [0,0];
 	foreach index2 do
 		execution_<"[$comp name]">[index2].current:= clear_<"[$comp name]"> (execution_<"[$comp name]">, index2)
-	end;	
-	<'
-	if {$argv} {'>Cores:= Cores+1; <'}}'><"\n\t">finalrep_<"[$comp name]">; to start<'}
+	end;
+	to shutdown
+
+<'}
+
+
+
+set last "noperm"
 
 foreach t [$comp tasks] {
 if {![catch {$t period}]} {'><"\n">
 /* <"[$t name]"> timer */
  
-process timer_<"[$t name]">_<"[$comp name]"> <'
+process timer_<"[$t name]">_<"[$comp name]"> [shuttimer_<"[$t name]">_<"[$comp name]">: sync<'
+if {$last != "noperm"} {'>, end_spawn_<"$last">_<"[$comp name]">: sync<'}'>](&tick_<"[$t name]">_<"[$comp name]">: bool) is
+		
+states <'
+if {$last != "noperm"} {'>idle, <'}'> start, shutdown<'
 
-if {[llength [$t codels]]} {'>[<'
-if {$t != [lindex [$comp tasks] 0]} {'>end_spawn_<"$last">_<"[$comp name]">: sync<'
-} else {'>begin_spawn_<"[$t name]">_<"[$comp name]">: sync<'}'>]<'}'>(&tick_<"[$t name]">_<"[$comp name]">: bool, &shuttimer_<"[$t name]">_<"[$comp name]">: bool) is
+if {$last != "noperm"} {'>
 
-<'if {[llength [$t codels]]} {'>
-	
-	
-states idle, start, shutdown
 
 from idle
 
-<'if {$t == [lindex [$comp tasks] 0]} {'>begin_spawn_<"[$t name]">_<"[$comp name]">; <'
-} else {'>end_spawn_<"$last">_<"[$comp name]">; <'}'>to start
-
-<'} else {'>
-	
-states start, shutdown
+end_spawn_<"$last">_<"[$comp name]">; to start
 
 <'}'>
 
 from start
-	wait[<"[[$t period] value]">, <"[[$t period] value]">];
-	if shuttimer_<"[$t name]">_<"[$comp name]"> then to shutdown end;
-	tick_<"[$t name]">_<"[$comp name]">:= true; to start<'}'>
+	select 
+	wait[<"[[$t period] value]">, <"[[$t period] value]">]; tick_<"[$t name]">_<"[$comp name]">:= true; to start
+	[] shuttimer_<"[$t name]">_<"[$comp name]">; to shutdown
+	end
 
+<'}'>
 
 /* <"[$t name]"> manager */
 
-process Taskmanager_<"[$t name]">_<"[$comp name]"> (&turn_<"[$t name]">_<"[$comp name]"> :dynamicservice_<"[$comp name]"><'
+process Taskmanager_<"[$t name]">_<"[$comp name]"> <'
+if {![catch {$t period}]} {'>[shuttimer_<"[$t name]">_<"[$comp name]">: sync]<'}'> (&turn_<"[$t name]">_<"[$comp name]"> :dynamicservice_<"[$comp name]"><'
 if {[llength [$t services]]} {'>, &execution_<"[$comp name]"> : staticScheduler_<"[$comp name]">, &finished_<"[$t name]">_<"[$comp name]">: bool, &sched_<"[$comp name]">: bool<'}
 if {$argv} {'>, &Cores: 0..CoresNumber<'}
-if {![catch {$t period}]} {'>, &tick_<"[$t name]">_<"[$comp name]">: bool, &shuttimer_<"[$t name]">_<"[$comp name]">: bool<'}
+if {![catch {$t period}]} {'>, &tick_<"[$t name]">_<"[$comp name]">: bool<'}
 if {[llength [$t codels]]} {'>, &endperm_<"[$t name]">_<"[$comp name]">: bool<'}'>, &lock_<"[$t name]">_<"[$comp name]">:0..1, &shut_<"[$comp name]">: bool) is
 states start, orchestrate, shutdown
 
 <'if {[llength [$t services]]} {'>var index: Index_<"[$comp name]">, firstfiring: bool, temp: bool:= false<'}'>
   
 from start<"\n\t"><' 
-if {![catch {$t period}]} {'>wait[0,0];<"\n\t"> on tick_<"[$t name]">_<"[$comp name]">; tick_<"[$t name]">_<"[$comp name]">:= false; <'}
-if {[llength [$t services]]} {'>index:=index_<"[$t name]">_<"[$comp name]">; firstfiring:= true;<"\n\t">if not ((running_<"[$comp name]">(execution_<"[$comp name]">, index_<"[$t name]">_<"[$comp name]">, width_<"[$t name]">_<"[$comp name]">))<'
-if {[llength [$t codels]]} {'> or not endperm_<"[$t name]">_<"[$comp name]"><'}'>)<'
-} else {'>if endperm_<"[$t name]">_<"[$comp name]"><'}'> then 
-			if shut_<"[$comp name]"> then<'
-if {![catch {$t period}]} {'> shuttimer_<"[$t name]">_<"[$comp name]">:= true;<'}'> to shutdown else to start end
-	else <'
+if {![catch {$t period}]} {'><"\n\t"> on tick_<"[$t name]">_<"[$comp name]">; tick_<"[$t name]">_<"[$comp name]">:= false; <'}
+if {[llength [$t services]]} {'>index:=index_<"[$t name]">_<"[$comp name]">; firstfiring:= true;<'}'>
+<"\n\t">if (shut_<"[$comp name]"><'
+if {[llength [$t services]]} {'> and not (running_<"[$comp name]">(execution_<"[$comp name]">, index_<"[$t name]">_<"[$comp name]">, width_<"[$t name]">_<"[$comp name]">))<'}'>) then <'
+if {![catch {$t period}]} {'> shuttimer_<"[$t name]">_<"[$comp name]">;<'}'> to shutdown 
+
+	else wait[0,0];<'
 if {$argv} {'>on Cores>0; Cores:= Cores-1; <'}
-if {![llength [$t services]]} {'>lock_<"[$t name]">_<"[$comp name]">:= 1; to orchestrate<'
-} else {
 if {[llength [$t codels]]} {'><"\n\t\t">if not endperm_<"[$t name]">_<"[$comp name]"> then lock_<"[$t name]">_<"[$comp name]">:= 1 end; to orchestrate<'
-} else {'><"\n\t\t">to orchestrate<'}}'><"\n\t">end
+} else {'><"\n\t\t">to orchestrate<'}'><"\n\t">end
 
 from orchestrate
 	wait [0,0]; on lock_<"[$t name]">_<"[$comp name]">=0;<' 
@@ -623,7 +647,7 @@ if {$argv} {'>Cores:= Cores+1; <'}'> to start<'
 		end;
 		index:= next_<"[$comp name]">(execution_<"[$comp name]">, index+1, index_<"[$t name]">_<"[$comp name]">, width_<"[$t name]">_<"[$comp name]">);
 		turn_<"[$t name]">_<"[$comp name]">:= execution_<"[$comp name]">[index];
-		if index>width_<"[$comp name]">-1 then
+		if index=width_<"[$comp name]"> then
 		if temp then temp:= false; sched_<"[$comp name]">:= true end; <'
 		if {$argv} {'>Cores:= Cores+1; <'}'>to start
 		else
@@ -632,18 +656,19 @@ if {$argv} {'>Cores:= Cores+1; <'}'> to start<'
 	end;
 	firstfiring:= false;
 	index:= next_<"[$comp name]">(execution_<"[$comp name]">, index, index_<"[$t name]">_<"[$comp name]">, width_<"[$t name]">_<"[$comp name]">);
-	if index>width_<"[$comp name]">-1 then <'
+	if index=width_<"[$comp name]"> then <'
 if {$argv} {'>Cores:= Cores+1; <'}'>to start end;
 	turn_<"[$t name]">_<"[$comp name]">:= execution_<"[$comp name]">[index];
 	lock_<"[$t name]">_<"[$comp name]">:= 1; to orchestrate<'}
+	
 if {[llength [$t codels]]} {'><"\n\n">/* <"[$t name]"> permanent activity automaton */
 
 process Task_<"[$t name]">_<"[$comp name]"> [end_spawn_<"[$t name]">_<"[$comp name]">: sync<'
-if {$t != [lindex [$comp tasks] 0]} {'>, end_spawn_<"$last">_<"[$comp name]">: sync<'
-} else {'>, begin_spawn_<"[$t name]">_<"[$comp name]">: sync<'}'>] (&lock_<"[$t name]">_<"[$comp name]">: 0..1, &endperm_<"[$t name]">_<"[$comp name]">: bool, &turn_<"[$t name]">_<"[$comp name]">: dynamicservice_<"[$comp name]">, &shut_<"[$comp name]">: bool<'
+if {$last!="noperm"} {'>, end_spawn_<"$last">_<"[$comp name]">: sync<'}'>] (&lock_<"[$t name]">_<"[$comp name]">: 0..1, &endperm_<"[$t name]">_<"[$comp name]">: bool, &turn_<"[$t name]">_<"[$comp name]">: dynamicservice_<"[$comp name]"><'
 if {$codelnumber} {'>, &DMutex_<"[$comp name]">: Mutex_<"[$comp name]"><'}
 if {[llength [dotgen components]]>1} {'>, &Ports: PortsArray<'}'>) is
-states idle, <'
+states <'
+if {$last != "noperm"} {'>idle, <'}
 set stop 0
 foreach c [$t codels] {
 set ports [list]
@@ -656,14 +681,12 @@ if {![llength [$c mutex]]  && ![llength $ports]} {'><"[$tr name]">_, <'
 
 var first_exec: bool:= true
 
-
-from idle
-
-<'if {$t != [lindex [$comp tasks] 0]} {'>end_spawn_<"$last">_<'
-} else {'>begin_spawn_<"[$t name]">_<'}'><"[$comp name]">;
-to start_
+<'if {$last != "noperm"} {'>
 	
-<'
+from idle
+	end_spawn_<"$last">_<"[$comp name]">; to start_
+	
+<'}
 
 foreach c [$t codels] {
 foreach tr [$c triggers] {'><"\n\n">from <'
@@ -671,12 +694,7 @@ set ports [list]
 if {[llength [dotgen components]]>1} {
 	set ports [mutex-ports dotgen $c]}
 if {![llength [$c mutex]]  && ![llength $ports]} {'><"[$tr name]">_/* thread-safe codel */<"\n\t"><'
-if {[$tr name]!="stop"} {'>if shut_<"[$comp name]"> then on (turn_<"[$t name]">_<"[$comp name]">.name= None_<"[$comp name]"> and lock_<"[$t name]">_<"[$comp name]">=1);
-	wait [0,0];<'
-if {!$stop} {'> lock_<"[$t name]">_<"[$comp name]">:=0; endperm_<"[$t name]">_<"[$comp name]">:=true; to ether_ /* absence of stop codel.. directly to ether */<'
-} else {'> to stop_<'}'><"\n\t">else <'}
 if {[$tr name] == "start"} {'><"\n\t">if first_exec then end_spawn_<"[$t name]">_<"[$comp name]">
-	
 	else on (turn_<"[$t name]">_<"[$comp name]">.name= None_<"[$comp name]"> and lock_<"[$t name]">_<"[$comp name]">=1);
 	wait <'
 if {![catch {$c wcet}]} {'>]0,<"[[$c wcet] value]">] <'
@@ -702,14 +720,10 @@ if {[$y name]=="ether"} {'>endperm_<"[$t name]">_<"[$comp name]">:=true; lock_<"
 if {[$y kind] == "pause event"} {'>
 lock_<"[$t name]">_<"[$comp name]">:=0; first_exec:= false; <'}'>to <"[$y name]">_<'
 }}'><"\n\t">end<'}
-if {[$tr name]!="stop"} {'><"\n\t">end<'}'><"\n"><'
 
-} else {'><"[$tr name]">_<"\n\t">wait [0,0]; <'
+} else {'><"[$tr name]">_<"\n\t">wait [0,0]; 
   
-if {[$tr name]!="stop"} {'><"\n\t">if shut_<"[$comp name]"> then on (turn_<"[$t name]">_<"[$comp name]">.name= None_<"[$comp name]"> and lock_<"[$t name]">_<"[$comp name]">=1); <'
-if {!$stop} {'> lock_<"[$t name]">_<"[$comp name]">:=0; endperm_<"[$t name]">_<"[$comp name]">:=true; to ether_ /* absence of stop codel.. directly to ether */<'
-} else {'> to stop_<'}'><"\n\t">else on (<'
-} else {'> on (<'}
+on (<'
 set mutex [mutex-indexes $comp $c]
 foreach m $mutex {
 	if {$m != [lindex $mutex end]} {'>not DMutex_<"[$comp name]">[<"[lindex $m 0]">]/*incmopatible with <"[lindex $m 1]">_<"[lindex $m 2]">*/<'
@@ -719,10 +733,10 @@ foreach p $ports {'>not Ports[<"[lindex $p 0]">] /* uses (<"[lindex $p 1]">) the
 	if {$p!=[lindex $ports end]} {'> and <'}}'>);
 	if not first_exec then on (turn_<"[$t name]">_<"[$comp name]">.name= None_<"[$comp name]"> and lock_<"[$t name]">_<"[$comp name]">=1) end;
 	<'if {[llength [$c mutex]]} {'> DMutex_<"[$comp name]">[<"$m">]:= true;<'}
-	foreach p $ports {'> Ports[<"[lindex $p 0]">]:= true;<'}'> to <"[$tr name]">_2<'
+	foreach p $ports {'> Ports[<"[lindex $p 0]">]:= true;<'}'> to <"[$tr name]">_2
+	
+from <"[$tr name]">_2<'
 
-
-if {[$tr name]!="stop"} {'><"\n\t">end<'}'><"\n">from <"[$tr name]">_2<'
 if {[$tr name] == "start"} {'><"\n\t">if first_exec then end_spawn_<"[$t name]">_<"[$comp name]">
 	
 	else 
@@ -753,7 +767,6 @@ if {[$y name]=="ether"} {'>endperm_<"[$t name]">_<"[$comp name]">:=true; lock_<"
 if {[$y kind] == "pause event"} {'>
 lock_<"[$t name]">_<"[$comp name]">:=0; first_exec:= false; <'}'>to <"[$y name]">_<'
 }}'><"\n\t">end<'}}}}
-if {$stop} {'><"\n\n">from ether_<"\n\t">wait [0,0]; on (shut_<"[$comp name]"> and turn_<"[$t name]">_<"[$comp name]">.name= None_<"[$comp name]"> and lock_<"[$t name]">_<"[$comp name]">=1); to stop_<'}
 set last [$t name]}'><"\n">
 
 /* services managed by <"[$t name]">*/
@@ -847,8 +860,8 @@ var <'
 if {$argv && [llength [dotgen components]]<2} {'>Cores: 0..CoresNumber:= CoresNumber, <'}
 if {$codelnumber} {'>DMutex_<"[$comp name]">: Mutex_<"[$comp name]">:= [<'
 for {set k 1} {$k <= $codelnumber} {incr k} {'>false<'
-	if {$k < $codelnumber} {'>, <'}}'>], <'}
-if {[llength $services]} {'>execution_<"[$comp name]">:staticScheduler_<"[$comp name]"> := [<'
+	if {$k < $codelnumber} {'>, <'}}'>], <'}'>
+execution_<"[$comp name]">:staticScheduler_<"[$comp name]"> := [<'
 foreach a $activities {
 set incomp 0
 foreach inc $selfincompatible {
@@ -856,25 +869,21 @@ if {$a == $inc} {
 set incomp 1'>{name=<"[$a name]">_<"[[$a task] name]">_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=1}, {name=<"[$a name]">_<"[[$a task] name]">_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=2}, <'
 break}}
 if {$incomp==0} {
-for {set k 1} {$k <= $max} {incr k} {'>{name=<"[$a name]">_<"[[$a task] name]">_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=<"$k">}, <'}}}
-foreach at $attributes {'>
-{name=<"[$at name]">_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=0}, <'}
-foreach f $functions {'>
-{name=<"[$f name]">_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=0}, <'}'>{name=None_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=0}],<'}
+for {set k 1} {$k <= $max} {incr k} {'>{name=<"[$a name]">_<"[[$a task] name]">_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=<"$k">}, <'}}}'>{name=None_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=0}],<'
 foreach t [$comp tasks] {'> turn_<"[$t name]">_<"[$comp name]">: dynamicservice_<"[$comp name]">:={name=None_<"[$comp name]">, current=VOID_<"[$comp name]">, instance=0}, lock_<"[$t name]">_<"[$comp name]">: 0..1:= 0,<'
 if {[llength [$t services]]} {'> finished_<"[$t name]">_<"[$comp name]">: bool:= false,<'}
 if {[llength [$t codels]]} {'> endperm_<"[$t name]">_<"[$comp name]">: bool:= false,<'}
-if {![catch {$t period}]} {'> tick_<"[$t name]">_<"[$comp name]">: bool:= false, shuttimer_<"[$t name]">_<"[$comp name]">: bool:= false,<'}}'> shut_<"[$comp name]">: bool:= false<'
+if {![catch {$t period}]} {'> tick_<"[$t name]">_<"[$comp name]">: bool:= false,<'}}'> shut_<"[$comp name]">: bool:= false<'
 if {[llength $activities]} {'>, sched_<"[$comp name]">: bool:= false<'}'>
 
 port<"\n\t"><'
 if {$lastperm} {
-if {[llength [[lindex [$comp tasks] 0] codels]]} {'>
-	
-	begin_spawn_<"[[lindex [$comp tasks] 0] name]">_<"[$comp name]">: sync in [0,0],
 
-<'}
 foreach t [$comp tasks] {
+	
+	if {![catch {$t period}]} {'>
+		shuttimer_<"[$t name]">_<"[$comp name]">: sync in [0,0],<'}
+	
 	if {[llength [$t codels]]} {'>
 		
 		end_spawn_<"[$t name]">_<"[$comp name]">: sync in <'
@@ -882,34 +891,34 @@ foreach t [$comp tasks] {
 		} else {'>[0,0]<'}'>,
 		
 <'}}}
-if {[llength $activities]} {'>reqimm_<"[$comp name]">: service_<"[$comp name]"> in [0,0],<"\n\t">Creqimm_<"[$comp name]">: CR_<"[$comp name]"> in [0,0],<"\n\t">intrep_<"[$comp name]">: Index_<"[$comp name]"> in [0,0],<"\n\t"><'}
-if {[llength $services]} {'>req_<"[$comp name]">: service_<"[$comp name]">,<"\n\t">finalrep_<"[$comp name]">: sync in [0,0],<"\n\t"><'}'>Creq_<"[$comp name]">: CR_<"[$comp name]">,<"\n\t">Creply_<"[$comp name]">: CRreply_<"[$comp name]"> in [0,0]
+if {[llength $activities]} {'>reqimm_<"[$comp name]">: service_<"[$comp name]"> in [0,0],<"\n\t">Creqimm_<"[$comp name]">: CR_<"[$comp name]"> in [0,0],<"\n\t"><'}
+if {[llength $services]} {'>req_<"[$comp name]">: service_<"[$comp name]">,<"\n\t"><'}'>Creq_<"[$comp name]">: CR_<"[$comp name]">
 
-par * in<"\n\t">client_<"[$comp name]">[<'
-if {[llength $services]} {'>req_<"[$comp name]">, <'}'>Creq_<"[$comp name]">, <'
-if {[llength $activities]} {'>reqimm_<"[$comp name]">, Creqimm_<"[$comp name]">, intrep_<"[$comp name]">, <'}
-if {[llength $services]} {'>finalrep_<"[$comp name]">, <'}'>Creply_<"[$comp name]">]<"\n\t">|| CT_<"[$comp name]">[<'
+par * in<"\n\t"><'
+if {[llength [dotgen components]] == 1} {'>client_<"[$comp name]">[<'
+if {[llength $services]} {'>req_<"[$comp name]">, <'}'>Creq_<"[$comp name]"><'
+if {[llength $activities]} {'>, reqimm_<"[$comp name]">, Creqimm_<"[$comp name]"><'}'>]<"\n\t">||<'}'> CT_<"[$comp name]">[<'
 if {$lastperm} {'>end_spawn_<"[[lindex [$comp tasks] [expr $lastperm - 1]] name]">_<"[$comp name]">, <'}
-if {[llength $services]} {'>req_<"[$comp name]">, <'}'>Creq_<"[$comp name]">, <'
-if {[llength $activities]} {'>reqimm_<"[$comp name]">, Creqimm_<"[$comp name]">, intrep_<"[$comp name]">, <'}
-if {[llength $services]} {'>finalrep_<"[$comp name]">, <'}'>Creply_<"[$comp name]">] (<'
+if {[llength $services]} {'>req_<"[$comp name]">, <'}'>Creq_<"[$comp name]"><'
+if {[llength $activities]} {'>, reqimm_<"[$comp name]">, Creqimm_<"[$comp name]"><'}'>] (<'
 if {$argv} {'>&Cores, <'}
 if {[llength $services]} {'>&execution_<"[$comp name]">, <'
 if {[llength $activities]} {'>&sched_<"[$comp name]">, <'}}'>&shut_<"[$comp name]"><'
 if {$codelnumber} {'>, &DMutex_<"[$comp name]"><'}
 if {[llength [dotgen components]]>1} {'>, &Ports<'}'>)<'
+set last "noperm"
 foreach t [$comp tasks] {
-if {![catch {$t period}]} {'><"\n\t">|| timer_<"[$t name]">_<"[$comp name]"><'
-if {[llength [$t codels]]} {'>[<'
-if {$t == [lindex [$comp tasks] 0]} {'>begin_spawn_<"[$t name]">_<"[$comp name]"><'
-} else {'>end_spawn_<"$last">_<"[$comp name]"><'}'>]<'}'> (&tick_<"[$t name]">_<"[$comp name]">, &shuttimer_<"[$t name]">_<"[$comp name]">)<'}'><"\n\t">|| Taskmanager_<"[$t name]">_<"[$comp name]"> (&turn_<"[$t name]">_<"[$comp name]"><'
+if {![catch {$t period}]} {'><"\n\t">|| timer_<"[$t name]">_<"[$comp name]"> [shuttimer_<"[$t name]">_<"[$comp name]"><'
+if {$last != "noperm"} {'>, end_spawn_<"$last">_<"[$comp name]"><'}'>](&tick_<"[$t name]">_<"[$comp name]">)<'}'>
+
+<"\t">|| Taskmanager_<"[$t name]">_<"[$comp name]"> <'
+if {![catch {$t period}]} {'>[shuttimer_<"[$t name]">_<"[$comp name]">]<'}'> (&turn_<"[$t name]">_<"[$comp name]"><'
 if {[llength [$t services]]} {'>, &execution_<"[$comp name]">, &finished_<"[$t name]">_<"[$comp name]">, &sched_<"[$comp name]"><'}
 if {$argv} {'>, &Cores<'}
-if {![catch {$t period}]} {'>, &tick_<"[$t name]">_<"[$comp name]">, &shuttimer_<"[$t name]">_<"[$comp name]"><'}
+if {![catch {$t period}]} {'>, &tick_<"[$t name]">_<"[$comp name]"><'}
 if {[llength [$t codels]]} {'>, &endperm_<"[$t name]">_<"[$comp name]"><'}'>, &lock_<"[$t name]">_<"[$comp name]">, &shut_<"[$comp name]">)<'
 if {[llength [$t codels]]} {'><"\n\t">|| Task_<"[$t name]">_<"[$comp name]"> [end_spawn_<"[$t name]">_<"[$comp name]"><'
-if {$t != [lindex [$comp tasks] 0]} {'>, end_spawn_<"$last">_<"[$comp name]"><'
-} else {'>, begin_spawn_<"[$t name]">_<"[$comp name]"><'}'>] (&lock_<"[$t name]">_<"[$comp name]">, &endperm_<"[$t name]">_<"[$comp name]">, &turn_<"[$t name]">_<"[$comp name]">, &shut_<"[$comp name]"><'
+if {$last != "noperm"} {'>, end_spawn_<"$last">_<"[$comp name]"><'}'>] (&lock_<"[$t name]">_<"[$comp name]">, &endperm_<"[$t name]">_<"[$comp name]">, &turn_<"[$t name]">_<"[$comp name]"><'
 if {$codelnumber} {'>, &DMutex_<"[$comp name]"><'}
 if {[llength [dotgen components]]>1} {'>, &Ports<'}'>)<'
 set last [$t name]}
